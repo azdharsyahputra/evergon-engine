@@ -1,0 +1,14 @@
+[03-Dec-2025 14:27:20] NOTICE: fpm is running, pid 73394
+[03-Dec-2025 14:27:20] NOTICE: ready to handle connections
+[03-Dec-2025 14:27:36] NOTICE: fpm is running, pid 73665
+[03-Dec-2025 14:27:36] NOTICE: ready to handle connections
+[03-Dec-2025 14:35:50] NOTICE: fpm is running, pid 77719
+[03-Dec-2025 14:35:50] NOTICE: ready to handle connections
+[03-Dec-2025 14:37:06] ERROR: unable to bind listening socket for address '127.0.0.1:10100': Address already in use (98)
+[03-Dec-2025 14:37:06] ERROR: FPM initialization failed
+[03-Dec-2025 14:50:48] NOTICE: fpm is running, pid 85435
+[03-Dec-2025 14:50:48] NOTICE: ready to handle connections
+[03-Dec-2025 14:51:35] NOTICE: fpm is running, pid 85814
+[03-Dec-2025 14:51:35] NOTICE: ready to handle connections
+[03-Dec-2025 14:56:23] NOTICE: fpm is running, pid 88427
+[03-Dec-2025 14:56:23] NOTICE: ready to handle connections

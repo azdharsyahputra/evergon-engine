@@ -99,7 +99,6 @@ func RegisterRoutes(mux *http.ServeMux, engine *core.Engine) {
 	})
 }
 
-// Utility JSON Writer
 func writeJSON(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(data)

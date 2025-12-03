@@ -15,25 +15,55 @@ func main() {
 		return
 	}
 
-	// Base path tempat evergon berada
+	// Base path tempat binary evergon berada
 	base, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 	engine := core.NewEngine(base)
 
 	switch os.Args[1] {
 
+	// ----------------------------------------------------
+	// START ENGINE
+	// ----------------------------------------------------
 	case "start":
+		fmt.Println("[Init] Cleaning project runtimes before start...")
+		engine.ForceKillAllProjectRuntimes()
+
 		if err := engine.StartAll(); err != nil {
 			fmt.Println("Error starting services:", err)
+			return
 		}
 
+		// START API AUTOMATICALLY
+		go func() {
+			fmt.Println("[API] Starting Evergon API on :7070 ...")
+			api.StartAPIServer(engine)
+		}()
+
+		fmt.Println("Evergon fully started. API available at http://localhost:7070")
+
+		// BLOCK so process stays alive
+		select {}
+
+	// ----------------------------------------------------
+	// STOP ENGINE
+	// ----------------------------------------------------
 	case "stop":
 		if err := engine.StopAll(); err != nil {
 			fmt.Println("Error stopping services:", err)
 		}
 
+	// ----------------------------------------------------
+	// RUN EVERGON API
+	// ----------------------------------------------------
 	case "api":
+		fmt.Println("[Init] Cleaning project runtimes before API start...")
+		engine.ForceKillAllProjectRuntimes()
+
 		api.StartAPIServer(engine)
 
+	// ----------------------------------------------------
+	// PHP COMMANDS
+	// ----------------------------------------------------
 	case "php":
 		handlePHPCommand(engine)
 
@@ -43,9 +73,9 @@ func main() {
 	}
 }
 
-//////////////////////////////////////////////////////
-// CLI SUBCOMMAND: PHP
-//////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
+// PHP SUBCOMMANDS
+////////////////////////////////////////////////////////
 
 func handlePHPCommand(engine *core.Engine) {
 	if len(os.Args) < 3 {
@@ -63,6 +93,9 @@ func handlePHPCommand(engine *core.Engine) {
 		}
 		ver := os.Args[3]
 
+		// Killing all project runtimes before switching PHP version
+		engine.ForceKillAllProjectRuntimes()
+
 		if err := engine.SetPHPVersion(ver); err != nil {
 			fmt.Println("Error setting PHP version:", err)
 			return
@@ -70,7 +103,7 @@ func handlePHPCommand(engine *core.Engine) {
 
 		fmt.Println("PHP version switched to", ver)
 
-	case "versions": // evergon php versions
+	case "versions":
 		versions, err := engine.ListPHPVersions()
 		if err != nil {
 			fmt.Println("Error listing versions:", err)
@@ -78,7 +111,7 @@ func handlePHPCommand(engine *core.Engine) {
 		}
 		fmt.Println("Available PHP versions:", versions)
 
-	case "current": // evergon php current
+	case "current":
 		fmt.Println("Current PHP version:", engine.CurrentPHPVersion())
 
 	default:
@@ -87,9 +120,9 @@ func handlePHPCommand(engine *core.Engine) {
 	}
 }
 
-//////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
 // HELPERS
-//////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
 
 func printUsage() {
 	fmt.Println("Usage:")
