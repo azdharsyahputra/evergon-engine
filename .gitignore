@@ -1,5 +1,7 @@
-/nginx/
-/php/
-#on development all asset important are built locally
+/nginx/*
+/php/*
+
 !/php/.gitkeep
 !/nginx/.gitkeep
+
+#on development all asset important are built locally
