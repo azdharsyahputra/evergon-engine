@@ -1,18 +1,19 @@
 package api
 
 import (
+	"evergon/internal/core"
 	"fmt"
 	"net/http"
-
-	"evergon/internal/core"
 )
 
 func StartAPIServer(engine *core.Engine) {
 	mux := http.NewServeMux()
+
 	RegisterRoutes(mux, engine)
 
-	fmt.Println("Evergon API running at http://localhost:9091")
-	if err := http.ListenAndServe(":9091", mux); err != nil {
-		fmt.Println("API server error:", err)
+	fmt.Println("Evergon API running at http://localhost:7070")
+	err := http.ListenAndServe(":7070", mux)
+	if err != nil {
+		fmt.Println("API Server Error:", err)
 	}
 }

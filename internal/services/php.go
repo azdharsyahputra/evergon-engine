@@ -10,37 +10,48 @@ import (
 )
 
 type PHPService struct {
-	Base string
+	Root    string
+	Version string
 }
 
-func NewPHPService(root string) *PHPService {
+func NewPHPService(root string, version string) *PHPService {
 	return &PHPService{
-		Base: filepath.Join(root, "php"),
+		Root:    root,
+		Version: version,
 	}
 }
 
 func (s *PHPService) Name() string { return "php-fpm" }
 
+func (s *PHPService) basePath() string {
+	if s.Version == "" {
+		return filepath.Join(s.Root, "php")
+	}
+	return filepath.Join(s.Root, "php", s.Version)
+}
+
 func (s *PHPService) Start() error {
+	base := s.basePath()
+
 	util.KillPort(9099)
-	util.CleanupPID(filepath.Join(s.Base, "logs/php-fpm.pid"))
-	util.PreparePHPDirs(s.Base)
+	util.CleanupPID(filepath.Join(base, "logs/php-fpm.pid"))
+	util.PreparePHPDirs(base)
 
-	fpmBin := filepath.Join(s.Base, "sbin/php-fpm")
-	conf := filepath.Join(s.Base, "etc/php-fpm.conf")
-	ini := filepath.Join(s.Base, "etc/php.ini")
+	fpmBin := filepath.Join(base, "sbin/php-fpm")
+	conf := filepath.Join(base, "etc/php-fpm.conf")
+	ini := filepath.Join(base, "etc/php.ini")
 
-	fmt.Println("Starting PHP-FPM...")
+	fmt.Println("Starting PHP-FPM version", s.Version, "...")
 
 	cmd := exec.Command(fpmBin,
-		"-p", s.Base,
+		"-p", base,
 		"-y", conf,
 		"-c", ini,
 		"--daemonize",
 	)
 
 	cmd.Env = append(os.Environ(),
-		"LD_LIBRARY_PATH="+filepath.Join(s.Base, "libs")+":"+os.Getenv("LD_LIBRARY_PATH"),
+		"LD_LIBRARY_PATH="+filepath.Join(base, "libs")+":"+os.Getenv("LD_LIBRARY_PATH"),
 	)
 
 	cmd.Stdout = os.Stdout
@@ -49,13 +60,15 @@ func (s *PHPService) Start() error {
 }
 
 func (s *PHPService) Stop() error {
-	util.StopPID(filepath.Join(s.Base, "logs/php-fpm.pid"))
+	base := s.basePath()
+	util.StopPID(filepath.Join(base, "logs/php-fpm.pid"))
 	util.KillPort(9099)
 	return nil
 }
 
 func (s *PHPService) Status() ServiceStatus {
-	pid := util.GetPID(filepath.Join(s.Base, "logs/php-fpm.pid"))
+	base := s.basePath()
+	pid := util.GetPID(filepath.Join(base, "logs/php-fpm.pid"))
 	return ServiceStatus{
 		Running: util.IsAlive(pid),
 		PID:     pid,

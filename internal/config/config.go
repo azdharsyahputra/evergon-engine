@@ -1,15 +1,57 @@
 package config
 
-type Config struct {
-	HTTPPort int
-	FPMPort  int
-	APIPort  int
+import (
+	"encoding/json"
+	"os"
+)
+
+type EngineConfig struct {
+	PHPVersion string `json:"php_version"`
 }
 
-func Default() Config {
-	return Config{
-		HTTPPort: 8080,
-		FPMPort:  9099,
-		APIPort:  9091,
+func DefaultConfig() EngineConfig {
+	return EngineConfig{
+		PHPVersion: "83",
 	}
+}
+
+func Load(path string) EngineConfig {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return DefaultConfig()
+	}
+
+	var cfg EngineConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return DefaultConfig()
+	}
+
+	if cfg.PHPVersion == "" {
+		cfg.PHPVersion = DefaultConfig().PHPVersion
+	}
+
+	return cfg
+}
+
+func Save(path string, cfg EngineConfig) error {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(dir(path), 0o755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, data, 0o644)
+}
+
+// kecil tapi biar ga import path/filepath di sini
+func dir(path string) string {
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '/' {
+			return path[:i]
+		}
+	}
+	return "."
 }
