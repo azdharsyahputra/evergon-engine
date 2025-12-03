@@ -96,10 +96,21 @@ func (e *Engine) cleanupProjectRuntimes() {
 func (e *Engine) StartAll() error {
 	fmt.Println("=== EVERGON START ===")
 
+	// 0. prevent double-start
+	pidFile := filepath.Join(e.BasePath, "runtime", "evergon.pid")
+	if _, err := ReadPID(pidFile); err == nil {
+		fmt.Println("Evergon already running.")
+		return nil
+	}
+
+	// 1. tulis PID engine utama
+	mainPID := os.Getpid()
+	WritePID(pidFile, mainPID)
+
+	// 2. start global services
 	for _, s := range e.Services {
 		fmt.Println("Starting:", s.Name())
 		if err := s.Start(); err != nil {
-			fmt.Println("Failed to start", s.Name(), ":", err)
 			return err
 		}
 	}
@@ -107,24 +118,24 @@ func (e *Engine) StartAll() error {
 	fmt.Println("Evergon running at http://localhost:8080")
 	return nil
 }
-
-// Stop seluruh service + project runtimes
 func (e *Engine) StopAll() error {
 	fmt.Println("=== EVERGON STOP ===")
 
-	// 1) Stop global services dulu
+	// 1. stop global services
 	for _, s := range e.Services {
 		fmt.Println("Stopping:", s.Name())
-		if err := s.Stop(); err != nil {
-			fmt.Println("Failed to stop", s.Name(), ":", err)
-		}
+		s.Stop()
 	}
 
-	// 2) Kill semua runtime project (php-fpm & nginx per project)
-	fmt.Println("Cleaning up project runtimes...")
-	e.cleanupProjectRuntimes()
+	// 2. kill project runtimes
+	fmt.Println("[ForceKill] Cleaning all project runtimes ...")
+	KillAllProjectRuntimes(e.BasePath)
 
-	fmt.Println("Evergon stopped (including project runtimes).")
+	// 3. kill Evergon main process (jika dipanggil dari luar)
+	mainPIDFile := filepath.Join(e.BasePath, "runtime", "evergon.pid")
+	KillPID(mainPIDFile)
+
+	fmt.Println("Evergon stopped cleanly.")
 	return nil
 }
 

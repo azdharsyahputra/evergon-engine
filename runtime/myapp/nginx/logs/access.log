@@ -1,0 +1,6 @@
+127.0.0.1 - - [03/Dec/2025:15:26:48 +0700] "GET / HTTP/1.1" 200 77402 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+127.0.0.1 - - [03/Dec/2025:15:26:48 +0700] "GET /favicon.ico HTTP/1.1" 200 77137 "http://localhost:10000/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+127.0.0.1 - - [03/Dec/2025:15:27:00 +0700] "GET / HTTP/1.1" 200 77402 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+127.0.0.1 - - [03/Dec/2025:15:27:00 +0700] "GET /favicon.ico HTTP/1.1" 200 77137 "http://localhost:10000/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+127.0.0.1 - - [03/Dec/2025:15:27:23 +0700] "GET / HTTP/1.1" 200 21 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+127.0.0.1 - - [03/Dec/2025:15:27:24 +0700] "GET /favicon.ico HTTP/1.1" 200 21 "http://localhost:10000/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"

@@ -48,9 +48,11 @@ func main() {
 	// STOP ENGINE
 	// ----------------------------------------------------
 	case "stop":
-		if err := engine.StopAll(); err != nil {
+		err := engine.StopAll()
+		if err != nil {
 			fmt.Println("Error stopping services:", err)
 		}
+		os.Exit(0)
 
 	// ----------------------------------------------------
 	// RUN EVERGON API
