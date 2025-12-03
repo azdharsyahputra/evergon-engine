@@ -1,14 +1,5 @@
-/php/81/
-/php/83/
 /nginx/
 /php/
-/php/bin/
-/php/etc/
-/php/include/
-/php/lib/
-/php/sbin/
-/php/php/
-/php/logs/
 #on development all asset important are built locally
 !/php/.gitkeep
 !/nginx/.gitkeep
