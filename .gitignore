@@ -1,3 +1,5 @@
-evergon/www/reservasiapi
-evergon/php/81
-evergon/php/83
+/php/81/
+/php/83/
+/nginx/
+
+#on development all asset important are built locally
