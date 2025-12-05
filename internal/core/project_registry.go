@@ -92,23 +92,8 @@ func (r *ProjectRegistry) SaveConfig(name string, cfg *ProjectConfig) error {
 // UPDATE CONFIG
 // ------------------------------
 
-func (r *ProjectRegistry) Update(name string, newCfg *ProjectConfig) error {
-	oldCfg, err := r.LoadConfig(name)
-	if err != nil {
-		return err
-	}
-
-	if newCfg.PHPVersion != "" {
-		oldCfg.PHPVersion = newCfg.PHPVersion
-	}
-	if newCfg.Port != 0 {
-		oldCfg.Port = newCfg.Port
-	}
-	if newCfg.Root != "" {
-		oldCfg.Root = newCfg.Root
-	}
-
-	return r.SaveConfig(name, oldCfg)
+func (r *ProjectRegistry) Update(name string, cfg *ProjectConfig) error {
+	return cfg.Save(r.BasePath)
 }
 
 // ------------------------------

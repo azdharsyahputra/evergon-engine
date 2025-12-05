@@ -1,6 +1,6 @@
 {
   "name": "myapp",
   "php_version": "83",
-  "port": 10000,
+  "port": 9999,
   "root": "public"
 }

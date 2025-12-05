@@ -153,27 +153,62 @@ func (h *ProjectHandler) Register(mux *http.ServeMux) {
 
 		writeJSON(w, cfg)
 	})
-
 	// ========================
 	// UPDATE PROJECT CONFIG
 	// ========================
 	mux.HandleFunc("/project/update", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
+			http.Error(w, "POST only", 405)
 			return
 		}
 
 		name := r.URL.Query().Get("name")
+		if name == "" {
+			writeJSON(w, map[string]string{"error": "missing ?name"})
+			return
+		}
 
-		var req core.ProjectConfig
-		_ = json.NewDecoder(r.Body).Decode(&req)
-
-		err := h.Registry.Update(name, &req)
+		// load config existing
+		cfg, err := h.Registry.ReadConfig(name)
 		if err != nil {
+			writeJSON(w, map[string]string{"error": "project not found"})
+			return
+		}
+
+		// read JSON payload
+		var req struct {
+			Port       *int   `json:"port"`        // optional
+			PHPVersion string `json:"php_version"` // optional
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, map[string]string{"error": "invalid json"})
+			return
+		}
+
+		// apply updates
+		if req.Port != nil {
+			cfg.Port = *req.Port
+		}
+		if req.PHPVersion != "" {
+			cfg.PHPVersion = req.PHPVersion
+		}
+
+		// save config
+		if err := cfg.Save(h.BasePath); err != nil {
 			writeJSON(w, map[string]string{"error": err.Error()})
 			return
 		}
 
-		writeJSON(w, map[string]string{"status": "updated"})
+		// restart runtime
+		engine, _ := h.Registry.Load(name)
+		_ = engine.Stop()
+		_ = engine.Start()
+
+		writeJSON(w, map[string]any{
+			"status": "updated",
+			"config": cfg,
+		})
 	})
+
 }

@@ -14,3 +14,19 @@
 [03-Dec-2025 14:56:23] NOTICE: ready to handle connections
 [03-Dec-2025 15:24:25] NOTICE: fpm is running, pid 13899
 [03-Dec-2025 15:24:25] NOTICE: ready to handle connections
+[03-Dec-2025 15:47:07] NOTICE: fpm is running, pid 23906
+[03-Dec-2025 15:47:07] NOTICE: ready to handle connections
+[03-Dec-2025 16:16:57] NOTICE: fpm is running, pid 43313
+[03-Dec-2025 16:16:57] NOTICE: ready to handle connections
+[03-Dec-2025 16:19:43] NOTICE: fpm is running, pid 44236
+[03-Dec-2025 16:19:43] NOTICE: ready to handle connections
+[03-Dec-2025 16:20:53] NOTICE: fpm is running, pid 44687
+[03-Dec-2025 16:20:53] NOTICE: ready to handle connections
+[03-Dec-2025 16:23:19] NOTICE: fpm is running, pid 45630
+[03-Dec-2025 16:23:19] NOTICE: ready to handle connections
+[03-Dec-2025 16:23:23] ERROR: unable to bind listening socket for address '127.0.0.1:10099': Address already in use (98)
+[03-Dec-2025 16:23:23] ERROR: FPM initialization failed
+[03-Dec-2025 16:24:33] NOTICE: fpm is running, pid 46355
+[03-Dec-2025 16:24:33] NOTICE: ready to handle connections
+[03-Dec-2025 16:30:22] NOTICE: Terminating ...
+[03-Dec-2025 16:30:22] NOTICE: exiting, bye-bye!
