@@ -10,6 +10,7 @@ import (
 
 	"evergon/internal/config"
 	"evergon/internal/services"
+	"evergon/internal/util"
 )
 
 type Engine struct {
@@ -96,18 +97,27 @@ func (e *Engine) cleanupProjectRuntimes() {
 func (e *Engine) StartAll() error {
 	fmt.Println("=== EVERGON START ===")
 
-	// 0. prevent double-start
 	pidFile := filepath.Join(e.BasePath, "runtime", "evergon.pid")
-	if _, err := ReadPID(pidFile); err == nil {
-		fmt.Println("Evergon already running.")
-		return nil
+
+	if pid, err := ReadPID(pidFile); err == nil {
+		if util.IsAlive(pid) {
+			fmt.Println("Evergon already running.")
+			return nil
+		}
+		fmt.Println("Found stale Evergon PID, cleaning up ...")
+		KillPID(pidFile)
 	}
 
-	// 1. tulis PID engine utama
+	// tulis PID engine utama
+	if err := os.MkdirAll(filepath.Dir(pidFile), 0o755); err != nil {
+		return fmt.Errorf("failed to create runtime dir: %w", err)
+	}
 	mainPID := os.Getpid()
-	WritePID(pidFile, mainPID)
+	if err := WritePID(pidFile, mainPID); err != nil {
+		return fmt.Errorf("failed to write evergon pid: %w", err)
+	}
 
-	// 2. start global services
+	// start global services
 	for _, s := range e.Services {
 		fmt.Println("Starting:", s.Name())
 		if err := s.Start(); err != nil {
@@ -118,20 +128,21 @@ func (e *Engine) StartAll() error {
 	fmt.Println("Evergon running at http://localhost:8080")
 	return nil
 }
+
 func (e *Engine) StopAll() error {
 	fmt.Println("=== EVERGON STOP ===")
 
-	// 1. stop global services
+	// stop global services
 	for _, s := range e.Services {
 		fmt.Println("Stopping:", s.Name())
-		s.Stop()
+		_ = s.Stop()
 	}
 
-	// 2. kill project runtimes
+	// kill project runtimes
 	fmt.Println("[ForceKill] Cleaning all project runtimes ...")
 	KillAllProjectRuntimes(e.BasePath)
 
-	// 3. kill Evergon main process (jika dipanggil dari luar)
+	// kill Evergon main process (jika dipanggil dari luar)
 	mainPIDFile := filepath.Join(e.BasePath, "runtime", "evergon.pid")
 	KillPID(mainPIDFile)
 

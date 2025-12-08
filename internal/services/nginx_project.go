@@ -27,17 +27,13 @@ func (s *ProjectNginxService) Name() string {
 }
 
 func (s *ProjectNginxService) Start() error {
-
-	// ==== RUNTIME ROOT ====
 	runtimeRoot := filepath.Join(s.BasePath, "runtime", s.Project)
 	nginxRuntime := filepath.Join(runtimeRoot, "nginx")
 	runDir := filepath.Join(runtimeRoot, "run")
-	logDir := filepath.Join(nginxRuntime, "logs") // FIXED: logs now inside nginx/
+	logDir := filepath.Join(nginxRuntime, "logs")
 
-	// ==== PROJECT PUBLIC ====
 	projectPublic := filepath.Join(s.BasePath, "projects", s.Project, "public")
 
-	// ==== Ensure dirs exist ====
 	_ = os.MkdirAll(nginxRuntime, 0o755)
 	_ = os.MkdirAll(runDir, 0o755)
 	_ = os.MkdirAll(logDir, 0o755)
@@ -45,55 +41,53 @@ func (s *ProjectNginxService) Start() error {
 	confFile := filepath.Join(nginxRuntime, "nginx.conf")
 	pidFile := filepath.Join(runDir, "nginx.pid")
 
-	phpPort := s.Port + 100
 	nginxBin := filepath.Join(s.BasePath, "nginx/sbin/nginx")
+	sockPath := filepath.Join(runtimeRoot, "php", "php-fpm.sock")
 
-	// ==== Generate config ====
 	conf := fmt.Sprintf(`
-worker_processes  1;
+worker_processes 1;
 
 events {
-    worker_connections  1024;
+	worker_connections 1024;
 }
 
 http {
-    include       %s;
-    default_type  application/octet-stream;
+	include %s;
+	default_type application/octet-stream;
 
-    access_log  %s/access.log;
-    error_log   %s/error.log;
+	access_log %s/access.log;
+	error_log %s/error.log;
 
-    server {
-        listen %d;
-        server_name %s.local;
+	server {
+		listen %d;
+		server_name %s.local;
 
-        root %s;
-        index index.php index.html;
+		root %s;
+		index index.php index.html;
 
-        location / {
-            try_files $uri $uri/ /index.php?$query_string;
-        }
+		location / {
+			try_files $uri $uri/ /index.php?$query_string;
+		}
 
-        location ~ \.php$ {
-            fastcgi_pass 127.0.0.1:%d;
-            include %s;
-            fastcgi_param SCRIPT_FILENAME %s$fastcgi_script_name;
-        }
-    }
+		location ~ \.php$ {
+			fastcgi_pass unix:%s;
+			include %s;
+			fastcgi_param SCRIPT_FILENAME %s$fastcgi_script_name;
+		}
+	}
 }
 `, filepath.Join(s.BasePath, "nginx/conf/mime.types"),
 		logDir, logDir,
 		s.Port,
 		s.Project,
 		projectPublic,
-		phpPort,
+		sockPath,
 		filepath.Join(s.BasePath, "nginx/conf/fastcgi.conf"),
 		projectPublic,
 	)
 
-	os.WriteFile(confFile, []byte(conf), 0644)
+	_ = os.WriteFile(confFile, []byte(conf), 0644)
 
-	// ==== START NGINX ====
 	cmd := exec.Command(nginxBin,
 		"-p", nginxRuntime,
 		"-c", confFile,
@@ -107,7 +101,7 @@ http {
 }
 
 func (s *ProjectNginxService) Stop() error {
-	pidFile := filepath.Join(s.BasePath, "runtime", s.Project, "nginx/logs/nginx.pid")
+	pidFile := filepath.Join(s.BasePath, "runtime", s.Project, "run/nginx.pid")
 
 	data, err := os.ReadFile(pidFile)
 	if err == nil {
@@ -118,7 +112,6 @@ func (s *ProjectNginxService) Stop() error {
 		_ = os.Remove(pidFile)
 	}
 
-	// Kill leftover nginx workers for this project
 	killCmd := fmt.Sprintf(
 		"ps aux | grep nginx | grep '%s/runtime/%s' | awk '{print $2}' | xargs -r kill -9",
 		s.BasePath, s.Project,

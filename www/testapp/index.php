@@ -1,1 +1,1 @@
-haiii world
+<?php phpinfo(); ?>
