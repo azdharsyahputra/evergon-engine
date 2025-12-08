@@ -92,7 +92,6 @@ func (e *Engine) cleanupProjectRuntimes() {
 }
 
 // ---------- ENGINE START / STOP ----------
-
 // Mulai seluruh service
 func (e *Engine) StartAll() error {
 	fmt.Println("=== EVERGON START ===")
@@ -117,6 +116,27 @@ func (e *Engine) StartAll() error {
 		return fmt.Errorf("failed to write evergon pid: %w", err)
 	}
 
+	// ============================================
+	// AUTO HOSTS GENERATOR (SCAN /WWW → ADD DOMAINS)
+	// ============================================
+	wwwDir := filepath.Join(e.BasePath, "www")
+	entries, _ := os.ReadDir(wwwDir)
+
+	var domains []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			domains = append(domains, entry.Name()+".test")
+		}
+	}
+
+	if len(domains) > 0 {
+		fmt.Println("[Hosts] Syncing domains...")
+		if err := util.EnsureHosts(domains); err != nil {
+			fmt.Println("[Hosts] Failed to update /etc/hosts:", err)
+		}
+	}
+	// ============================================
+
 	// start global services
 	for _, s := range e.Services {
 		fmt.Println("Starting:", s.Name())
@@ -124,6 +144,9 @@ func (e *Engine) StartAll() error {
 			return err
 		}
 	}
+
+	fmt.Println("Using BasePath:", e.BasePath)
+	fmt.Println("Scanning WWW:", filepath.Join(e.BasePath, "www"))
 
 	fmt.Println("Evergon running at http://localhost:8080")
 	return nil

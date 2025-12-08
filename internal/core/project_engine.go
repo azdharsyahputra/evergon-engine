@@ -14,14 +14,14 @@ type ProjectEngine struct {
 	BasePath    string
 	Name        string
 	Config      *ProjectConfig
-	ProjectRoot string // path ke public milik user
-	RuntimeRoot string // path ke runtime/{project}
+	ProjectRoot string
+	RuntimeRoot string
 	Services    []services.Service
 }
 
-// -----------------------------------------------------------
+// ------------------------------------------------------------
 // INIT
-// -----------------------------------------------------------
+// ------------------------------------------------------------
 func NewProjectEngine(base, name string) (*ProjectEngine, error) {
 
 	cfg, err := LoadProjectConfig(base, name)
@@ -38,17 +38,8 @@ func NewProjectEngine(base, name string) (*ProjectEngine, error) {
 	nginxRoot := filepath.Join(runtimeRoot, "nginx")
 	nginxLogs := filepath.Join(runtimeRoot, "nginx/logs")
 
-	// Build runtime folders
-	for _, dir := range []string{
-		runtimeRoot,
-		runDir,
-		phpDir,
-		nginxRoot,
-		nginxLogs,
-	} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, fmt.Errorf("failed to create runtime folder: %w", err)
-		}
+	for _, dir := range []string{runtimeRoot, runDir, phpDir, nginxRoot, nginxLogs} {
+		_ = os.MkdirAll(dir, 0o755)
 	}
 
 	e := &ProjectEngine{
@@ -67,101 +58,75 @@ func NewProjectEngine(base, name string) (*ProjectEngine, error) {
 	return e, nil
 }
 
-// -----------------------------------------------------------
+// ------------------------------------------------------------
 // START
-// -----------------------------------------------------------
+// ------------------------------------------------------------
 func (e *ProjectEngine) Start() error {
 	fmt.Println("=== START PROJECT:", e.Name, "===")
 
-	for _, svc := range e.Services {
-		fmt.Println("Starting:", svc.Name())
-		if err := svc.Start(); err != nil {
-			return fmt.Errorf("error starting %s: %v", svc.Name(), err)
-		}
+	// Start PHP first → then Nginx
+	if err := e.Services[0].Start(); err != nil {
+		return fmt.Errorf("error starting PHP: %w", err)
+	}
+	if err := e.Services[1].Start(); err != nil {
+		return fmt.Errorf("error starting Nginx: %w", err)
 	}
 
 	return nil
 }
 
-// -----------------------------------------------------------
-// STOP — normal stop
-// -----------------------------------------------------------
+// ------------------------------------------------------------
+// STOP
+// ------------------------------------------------------------
 func (e *ProjectEngine) Stop() error {
 	fmt.Println("=== STOP PROJECT:", e.Name, "===")
 
-	for _, svc := range e.Services {
-		fmt.Println("Stopping:", svc.Name())
-		_ = svc.Stop()
-	}
+	// Stop PHP pool first
+	_ = e.Services[0].Stop()
 
-	// FINAL ensure cleanup
-	e.cleanupPorts()
+	// Stop Nginx-project second
+	_ = e.Services[1].Stop()
+
+	// Cleanup leftover processes
+	e.killLeftovers()
 
 	return nil
 }
 
-func (e *ProjectEngine) cleanupPorts() {
-	phpPort := e.Config.Port + 100
-	nginxPort := e.Config.Port
+// ------------------------------------------------------------
+// KILL leftovers
+// ------------------------------------------------------------
+func (e *ProjectEngine) killLeftovers() {
 
-	exec.Command("bash", "-c", fmt.Sprintf("lsof -t -i:%d | xargs -r kill -9", phpPort)).Run()
-	exec.Command("bash", "-c", fmt.Sprintf("lsof -t -i:%d | xargs -r kill -9", nginxPort)).Run()
-}
-
-// -----------------------------------------------------------
-// FORCE STOP — kill ALL related processes brutally
-// -----------------------------------------------------------
-func (e *ProjectEngine) ForceStopAll() {
-	fmt.Println("=== FORCE STOP PROJECT:", e.Name, "===")
-
-	for _, svc := range e.Services {
-		_ = svc.Stop()
-	}
-
-	e.KillAllProcesses()
-}
-
-// -----------------------------------------------------------
-// KILL leftover processes: php-fpm workers + nginx
-// -----------------------------------------------------------
-func (e *ProjectEngine) KillAllProcesses() {
-	project := e.Name
-
-	// Kill php-fpm workers that contain project name
+	// Kill php-fpm workers for this pool
 	out, _ := exec.Command("bash", "-c",
-		fmt.Sprintf("ps aux | grep php-fpm | grep '%s' | awk '{print $2}'", project),
+		fmt.Sprintf("ps aux | grep 'php-fpm: pool evergon_%s' | awk '{print $2}'", e.Name),
 	).Output()
 
 	for _, pid := range strings.Split(string(out), "\n") {
-		pid = strings.TrimSpace(pid)
-		if pid != "" {
-			exec.Command("kill", "-9", pid).Run()
+		p := strings.TrimSpace(pid)
+		if p != "" {
+			exec.Command("kill", "-9", p).Run()
 		}
 	}
 
-	// Kill nginx workers that contain project runtime path
+	// Kill nginx workers tied to this project
 	out, _ = exec.Command("bash", "-c",
-		fmt.Sprintf("ps aux | grep nginx | grep '%s' | awk '{print $2}'", project),
+		fmt.Sprintf("ps aux | grep nginx | grep '%s/runtime/%s' | awk '{print $2}'",
+			e.BasePath, e.Name),
 	).Output()
 
 	for _, pid := range strings.Split(string(out), "\n") {
-		pid = strings.TrimSpace(pid)
-		if pid != "" {
-			exec.Command("kill", "-9", pid).Run()
+		p := strings.TrimSpace(pid)
+		if p != "" {
+			exec.Command("kill", "-9", p).Run()
 		}
 	}
 }
 
-// -----------------------------------------------------------
-// CLEANUP runtime dirs if needed
-// -----------------------------------------------------------
-func (e *ProjectEngine) CleanRuntime() {
-	os.RemoveAll(e.RuntimeRoot)
-}
-
-// -----------------------------------------------------------
+// ------------------------------------------------------------
 // STATUS
-// -----------------------------------------------------------
+// ------------------------------------------------------------
 func (e *ProjectEngine) Status() map[string]services.ServiceStatus {
 	resp := map[string]services.ServiceStatus{}
 	for _, svc := range e.Services {

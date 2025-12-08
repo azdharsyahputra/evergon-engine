@@ -15,13 +15,9 @@ type ProjectPHPService struct {
 	Version  string
 }
 
-func NewProjectPHPService(base, project, version string, _ int) *ProjectPHPService {
-	return &ProjectPHPService{
-		BasePath: base,
-		Project:  project,
-		Version:  version,
-	}
-}
+// ------------------------------------------------------------
+// HELPERS
+// ------------------------------------------------------------
 
 func (s *ProjectPHPService) Name() string {
 	return "php-pool:" + s.Project
@@ -35,8 +31,8 @@ func (s *ProjectPHPService) phpBase() string {
 	return filepath.Join(s.BasePath, "php", s.Version)
 }
 
-func (s *ProjectPHPService) poolDir() string {
-	return filepath.Join(s.phpBase(), "etc", "php-fpm.d")
+func (s *ProjectPHPService) poolConfPath() string {
+	return filepath.Join(s.phpBase(), "etc", "php-fpm.d", s.poolName()+".conf")
 }
 
 func (s *ProjectPHPService) sockPath() string {
@@ -47,24 +43,29 @@ func (s *ProjectPHPService) logPath() string {
 	return filepath.Join(s.BasePath, "runtime", s.Project, "logs", "php-fpm.log")
 }
 
-func (s *ProjectPHPService) pidFile() string {
-	return filepath.Join(s.phpBase(), "var", "run", "php-fpm.pid")
+func (s *ProjectPHPService) globalPidFile() string {
+	// pid file FPM global (yang valid di portable PHP-FPM)
+	return filepath.Join(s.phpBase(), "logs", "php-fpm.pid")
 }
 
+// ------------------------------------------------------------
+// START — create pool & reload FPM
+// ------------------------------------------------------------
+
 func (s *ProjectPHPService) Start() error {
-	runtimeRoot := filepath.Join(s.BasePath, "runtime", s.Project)
-	phpRuntime := filepath.Join(runtimeRoot, "php")
-	logDir := filepath.Join(runtimeRoot, "logs")
 
-	_ = os.MkdirAll(phpRuntime, 0o755)
-	_ = os.MkdirAll(logDir, 0o755)
-	_ = os.MkdirAll(s.poolDir(), 0o755)
+	// Ensure dirs
+	runtimePHP := filepath.Join(s.BasePath, "runtime", s.Project, "php")
+	runtimeLog := filepath.Join(s.BasePath, "runtime", s.Project, "logs")
+	_ = os.MkdirAll(runtimePHP, 0o755)
+	_ = os.MkdirAll(runtimeLog, 0o755)
 
-	poolFile := filepath.Join(s.poolDir(), s.poolName()+".conf")
-
+	// Build pool config
 	poolConf := fmt.Sprintf(`
 [%s]
 listen = %s
+listen.owner = %s
+listen.group = %s
 listen.mode = 0660
 
 pm = dynamic
@@ -75,13 +76,51 @@ pm.max_spare_servers = 3
 
 php_admin_value[error_log] = %s
 php_admin_flag[log_errors] = on
-`, s.poolName(), s.sockPath(), s.logPath())
+`, s.poolName(), s.sockPath(), os.Getenv("USER"), os.Getenv("USER"), s.logPath())
 
-	if err := os.WriteFile(poolFile, []byte(poolConf), 0o644); err != nil {
-		return err
+	if err := os.WriteFile(s.poolConfPath(), []byte(poolConf), 0o644); err != nil {
+		return fmt.Errorf("failed writing pool file: %w", err)
 	}
 
-	data, err := os.ReadFile(s.pidFile())
+	// Reload FPM to activate new pool
+	return s.reloadFPM()
+}
+
+// ------------------------------------------------------------
+// STOP — remove pool & reload FPM (twice to flush workers)
+// ------------------------------------------------------------
+
+func (s *ProjectPHPService) Stop() error {
+	// Remove pool config
+	_ = os.Remove(s.poolConfPath())
+
+	// Remove socket
+	_ = os.Remove(s.sockPath())
+
+	// Reload FPM twice → untuk flush worker pool
+	_ = s.reloadFPM()
+	_ = s.reloadFPM()
+
+	return nil
+}
+
+// ------------------------------------------------------------
+// STATUS
+// ------------------------------------------------------------
+
+func (s *ProjectPHPService) Status() ServiceStatus {
+	if _, err := os.Stat(s.sockPath()); err == nil {
+		return ServiceStatus{Running: true}
+	}
+	return ServiceStatus{Running: false}
+}
+
+// ------------------------------------------------------------
+// INTERNAL — reload php-fpm master
+// ------------------------------------------------------------
+
+func (s *ProjectPHPService) reloadFPM() error {
+	data, err := os.ReadFile(s.globalPidFile())
 	if err != nil {
 		return fmt.Errorf("php-fpm not running for version %s", s.Version)
 	}
@@ -91,33 +130,7 @@ php_admin_flag[log_errors] = on
 		return err
 	}
 
-	_ = exec.Command("kill", "-USR2", strconv.Itoa(pid)).Run()
-
-	return nil
-}
-
-func (s *ProjectPHPService) Stop() error {
-	poolFile := filepath.Join(s.poolDir(), s.poolName()+".conf")
-	_ = os.Remove(poolFile)
-
-	data, err := os.ReadFile(s.pidFile())
-	if err == nil {
-		if pid, err2 := strconv.Atoi(strings.TrimSpace(string(data))); err2 == nil {
-			_ = exec.Command("kill", "-USR2", strconv.Itoa(pid)).Run()
-		}
-	}
-
-	_ = os.Remove(s.sockPath())
-
-	return nil
-}
-
-func (s *ProjectPHPService) Status() ServiceStatus {
-	if _, err := os.Stat(s.sockPath()); err == nil {
-		return ServiceStatus{
-			Running: true,
-			Port:    0,
-		}
-	}
-	return ServiceStatus{Running: false}
+	// USR2 = soft reload (safe)
+	cmd := exec.Command("kill", "-USR2", strconv.Itoa(pid))
+	return cmd.Run()
 }

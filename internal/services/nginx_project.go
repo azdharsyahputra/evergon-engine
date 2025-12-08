@@ -45,38 +45,38 @@ func (s *ProjectNginxService) Start() error {
 	sockPath := filepath.Join(runtimeRoot, "php", "php-fpm.sock")
 
 	conf := fmt.Sprintf(`
-worker_processes 1;
+	worker_processes 1;
 
-events {
-	worker_connections 1024;
-}
+	events {
+		worker_connections 1024;
+	}
 
-http {
-	include %s;
-	default_type application/octet-stream;
+	http {
+		include %s;
+		default_type application/octet-stream;
 
-	access_log %s/access.log;
-	error_log %s/error.log;
+		access_log %s/access.log;
+		error_log %s/error.log;
 
-	server {
-		listen %d;
-		server_name %s.local;
+		server {
+			listen %d;
+			server_name %s.local;
 
-		root %s;
-		index index.php index.html;
+			root %s;
+			index index.php index.html;
 
-		location / {
-			try_files $uri $uri/ /index.php?$query_string;
-		}
+			location / {
+				try_files $uri $uri/ /index.php?$query_string;
+			}
 
-		location ~ \.php$ {
-			fastcgi_pass unix:%s;
-			include %s;
-			fastcgi_param SCRIPT_FILENAME %s$fastcgi_script_name;
+			location ~ \.php$ {
+				fastcgi_pass unix:%s;
+				include %s;
+				fastcgi_param SCRIPT_FILENAME %s$fastcgi_script_name;
+			}
 		}
 	}
-}
-`, filepath.Join(s.BasePath, "nginx/conf/mime.types"),
+	`, filepath.Join(s.BasePath, "nginx/conf/mime.types"),
 		logDir, logDir,
 		s.Port,
 		s.Project,

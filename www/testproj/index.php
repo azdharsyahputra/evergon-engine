@@ -1,1 +1,1 @@
-<? phpinfo(); ?>
+akuuuu

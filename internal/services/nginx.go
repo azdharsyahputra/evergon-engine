@@ -25,27 +25,27 @@ func NewNginxService(root string, www string) *NginxService {
 func (s *NginxService) Name() string { return "nginx" }
 
 func (s *NginxService) Start() error {
-	// 1. Bersihin port + PID lama
+	// Bersihkan port dan PID lama
 	util.KillPort(8080)
 	util.CleanupPID(filepath.Join(s.Base, "logs/nginx.pid"))
 	util.PrepareNginxDirs(s.Base)
 
-	// 2. Generate nginx.conf dinamis (tanpa template eksternal)
+	// Generate nginx.conf dinamis
 	confFile := filepath.Join(s.Base, "conf/nginx.conf")
 	if err := s.generateConfig(confFile); err != nil {
 		return err
 	}
 
 	nginxBin := filepath.Join(s.Base, "sbin/nginx")
-	conf := confFile
 
 	fmt.Println("Starting Nginx global (www mode)...")
 
 	cmd := exec.Command(nginxBin,
 		"-p", s.Base,
-		"-c", conf,
+		"-c", confFile,
 	)
 
+	// Fix lib dependency untuk portable build
 	cmd.Env = append(os.Environ(),
 		"LD_LIBRARY_PATH="+filepath.Join(s.Base, "libs")+":"+os.Getenv("LD_LIBRARY_PATH"),
 	)
@@ -70,9 +70,9 @@ func (s *NginxService) Status() ServiceStatus {
 	}
 }
 
-// -------------------------------------------
+// -------------------------------------------------
 // CONFIG GENERATOR
-// -------------------------------------------
+// -------------------------------------------------
 
 func (s *NginxService) generateConfig(outPath string) error {
 	mimeTypes := filepath.Join(s.Base, "conf/mime.types")
@@ -84,8 +84,8 @@ func (s *NginxService) generateConfig(outPath string) error {
 		return err
 	}
 
+	// fallback kalau www kosong
 	if serverBlocks == "" {
-		// fallback minimal kalau www kosong
 		serverBlocks = fmt.Sprintf(`
 server {
     listen 8080 default_server;
@@ -121,10 +121,13 @@ http {
 	return os.WriteFile(outPath, []byte(conf), 0644)
 }
 
+// -------------------------------------------------
+// VHOST GENERATOR (PER-FOLDER DI /WWW)
+// -------------------------------------------------
+
 func (s *NginxService) buildServerBlocks(fastcgiConf string) (string, error) {
 	entries, err := os.ReadDir(s.WWWRoot)
 	if err != nil {
-		// kalau folder www belum ada / belum kepakai, anggap kosong
 		if os.IsNotExist(err) {
 			return "", nil
 		}
@@ -142,21 +145,23 @@ func (s *NginxService) buildServerBlocks(fastcgiConf string) (string, error) {
 		name := e.Name()
 		siteRoot := filepath.Join(s.WWWRoot, name)
 
+		// detect public folder (Laravel / CI4)
 		publicRoot := filepath.Join(siteRoot, "public")
 		if st, err := os.Stat(publicRoot); err == nil && st.IsDir() {
 			siteRoot = publicRoot
 		}
 
+		// first server becomes default server
 		listen := "8080"
 		if first {
 			listen = "8080 default_server"
 			first = false
 		}
 
-		server := fmt.Sprintf(`
+		serverBlock := fmt.Sprintf(`
 server {
     listen %s;
-    server_name %s.local;
+    server_name %s.test;
 
     root %s;
     index index.php index.html;
@@ -168,12 +173,12 @@ server {
     location ~ \.php$ {
         include %s;
         fastcgi_pass 127.0.0.1:9099;
-        fastcgi_param SCRIPT_FILENAME %s$fastcgi_script_name;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     }
 }
-`, listen, name, siteRoot, fastcgiConf, siteRoot)
+`, listen, name, siteRoot, fastcgiConf)
 
-		servers = append(servers, server)
+		servers = append(servers, serverBlock)
 	}
 
 	return strings.Join(servers, "\n"), nil
