@@ -9,15 +9,31 @@ import (
 	"strings"
 )
 
+// ==========================================================
+// PROJECT PHP-FPM POOL SERVICE
+// ==========================================================
+
 type ProjectPHPService struct {
 	BasePath string
 	Project  string
 	Version  string
 }
 
-// ------------------------------------------------------------
-// HELPERS
-// ------------------------------------------------------------
+// ----------------------------------------------------------
+// CONSTRUCTOR
+// ----------------------------------------------------------
+
+func NewProjectPHPService(base, project, version string, _ int) *ProjectPHPService {
+	return &ProjectPHPService{
+		BasePath: base,
+		Project:  project,
+		Version:  version,
+	}
+}
+
+// ----------------------------------------------------------
+// INTERNAL HELPERS
+// ----------------------------------------------------------
 
 func (s *ProjectPHPService) Name() string {
 	return "php-pool:" + s.Project
@@ -44,23 +60,20 @@ func (s *ProjectPHPService) logPath() string {
 }
 
 func (s *ProjectPHPService) globalPidFile() string {
-	// pid file FPM global (yang valid di portable PHP-FPM)
 	return filepath.Join(s.phpBase(), "logs", "php-fpm.pid")
 }
 
-// ------------------------------------------------------------
-// START — create pool & reload FPM
-// ------------------------------------------------------------
+// ----------------------------------------------------------
+// START POOL
+// ----------------------------------------------------------
 
 func (s *ProjectPHPService) Start() error {
 
-	// Ensure dirs
-	runtimePHP := filepath.Join(s.BasePath, "runtime", s.Project, "php")
-	runtimeLog := filepath.Join(s.BasePath, "runtime", s.Project, "logs")
-	_ = os.MkdirAll(runtimePHP, 0o755)
-	_ = os.MkdirAll(runtimeLog, 0o755)
+	// Create runtime dirs
+	_ = os.MkdirAll(filepath.Join(s.BasePath, "runtime", s.Project, "php"), 0o755)
+	_ = os.MkdirAll(filepath.Join(s.BasePath, "runtime", s.Project, "logs"), 0o755)
 
-	// Build pool config
+	// Pool configuration
 	poolConf := fmt.Sprintf(`
 [%s]
 listen = %s
@@ -79,45 +92,49 @@ php_admin_flag[log_errors] = on
 `, s.poolName(), s.sockPath(), os.Getenv("USER"), os.Getenv("USER"), s.logPath())
 
 	if err := os.WriteFile(s.poolConfPath(), []byte(poolConf), 0o644); err != nil {
-		return fmt.Errorf("failed writing pool file: %w", err)
+		return fmt.Errorf("failed writing pool conf: %w", err)
 	}
 
-	// Reload FPM to activate new pool
+	// Reload FPM to load new pool
 	return s.reloadFPM()
 }
 
-// ------------------------------------------------------------
-// STOP — remove pool & reload FPM (twice to flush workers)
-// ------------------------------------------------------------
+// ----------------------------------------------------------
+// STOP POOL
+// ----------------------------------------------------------
 
 func (s *ProjectPHPService) Stop() error {
+
 	// Remove pool config
 	_ = os.Remove(s.poolConfPath())
 
 	// Remove socket
 	_ = os.Remove(s.sockPath())
 
-	// Reload FPM twice → untuk flush worker pool
+	// Reload twice to flush worker processes
 	_ = s.reloadFPM()
 	_ = s.reloadFPM()
 
 	return nil
 }
 
-// ------------------------------------------------------------
+// ----------------------------------------------------------
 // STATUS
-// ------------------------------------------------------------
+// ----------------------------------------------------------
 
 func (s *ProjectPHPService) Status() ServiceStatus {
 	if _, err := os.Stat(s.sockPath()); err == nil {
-		return ServiceStatus{Running: true}
+		return ServiceStatus{
+			Running: true,
+			Port:    0,
+		}
 	}
 	return ServiceStatus{Running: false}
 }
 
-// ------------------------------------------------------------
-// INTERNAL — reload php-fpm master
-// ------------------------------------------------------------
+// ----------------------------------------------------------
+// INTERNAL: RELOAD FPM MASTER PROCESS
+// ----------------------------------------------------------
 
 func (s *ProjectPHPService) reloadFPM() error {
 	data, err := os.ReadFile(s.globalPidFile())
@@ -130,7 +147,6 @@ func (s *ProjectPHPService) reloadFPM() error {
 		return err
 	}
 
-	// USR2 = soft reload (safe)
 	cmd := exec.Command("kill", "-USR2", strconv.Itoa(pid))
 	return cmd.Run()
 }
