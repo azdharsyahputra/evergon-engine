@@ -22,12 +22,5 @@ func LoadProjectConfig(base, name string) (*ProjectConfig, error) {
 }
 
 func SaveProjectConfig(base, name string, cfg *ProjectConfig) error {
-	path := filepath.Join(base, "projects", name, ".evergon", "config.json")
-
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(path, data, 0o644)
+	return cfg.Save(base)
 }
