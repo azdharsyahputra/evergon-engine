@@ -12,3 +12,4 @@
 2025/12/09 14:44:54 [emerg] 45066#0: bind() to 0.0.0.0:9999 failed (98: Address already in use)
 2025/12/09 14:44:54 [emerg] 45066#0: still could not bind()
 2025/12/09 16:29:39 [alert] 48791#0: unlink() "/home/azdhar/evergon-build/evergon/runtime/myapp/run/nginx.pid" failed (2: No such file or directory)
+2025/12/10 16:25:43 [alert] 27316#0: unlink() "/home/azdhar/evergon-build/evergon/runtime/myapp/run/nginx.pid" failed (2: No such file or directory)

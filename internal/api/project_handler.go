@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"evergon/internal/core"
 )
@@ -208,6 +209,54 @@ func (h *ProjectHandler) Register(mux *http.ServeMux) {
 		writeJSON(w, map[string]any{
 			"status": "updated",
 			"config": cfg,
+		})
+	})
+
+	// ========================
+	// QUICK SET PORT
+	// ========================
+	mux.HandleFunc("/project/set-port", func(w http.ResponseWriter, r *http.Request) {
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST only", 405)
+			return
+		}
+
+		name := r.URL.Query().Get("name")
+		portStr := r.URL.Query().Get("port")
+
+		if name == "" || portStr == "" {
+			writeJSON(w, map[string]string{"error": "missing name or port"})
+			return
+		}
+
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			writeJSON(w, map[string]string{"error": "invalid port"})
+			return
+		}
+
+		cfg, err := h.Registry.ReadConfig(name)
+		if err != nil {
+			writeJSON(w, map[string]string{"error": "project not found"})
+			return
+		}
+
+		cfg.Port = port
+
+		if err := cfg.Save(h.BasePath); err != nil {
+			writeJSON(w, map[string]string{"error": err.Error()})
+			return
+		}
+
+		engine, _ := h.Registry.Load(name)
+		_ = engine.Stop()
+		_ = engine.Start()
+
+		writeJSON(w, map[string]any{
+			"status":  "port-updated",
+			"project": name,
+			"port":    port,
 		})
 	})
 

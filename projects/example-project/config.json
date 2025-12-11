@@ -1,6 +1,0 @@
-{
-  "name": "projectA",
-  "php_version": "83",
-  "port": 1000,
-  "root": "public"
-}
