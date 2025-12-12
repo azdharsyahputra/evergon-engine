@@ -52,13 +52,17 @@ func (e *Engine) saveConfig() error {
 }
 
 // ---------- PROJECT RUNTIME CLEANUP ----------
-
+// remove unix socket safely
+func removeSocket(path string) {
+	if _, err := os.Stat(path); err == nil {
+		_ = os.Remove(path)
+	}
+}
 func (e *Engine) cleanupProjectRuntimes() {
 	runtimeDir := filepath.Join(e.BasePath, "runtime")
 
 	entries, err := os.ReadDir(runtimeDir)
 	if err != nil {
-		// runtime belum ada, gak apa-apa
 		return
 	}
 
@@ -69,24 +73,26 @@ func (e *Engine) cleanupProjectRuntimes() {
 
 		project := entry.Name()
 		projectRuntime := filepath.Join(runtimeDir, project)
+
 		runDir := filepath.Join(projectRuntime, "run")
+		phpDir := filepath.Join(projectRuntime, "php")
 
 		phpPid := filepath.Join(runDir, "php-fpm.pid")
 		nginxPid := filepath.Join(runDir, "nginx.pid")
+		phpSock := filepath.Join(phpDir, "php-fpm.sock")
 
-		// kill php-fpm by PID
+		// Kill by PID
 		killPidFile(phpPid)
-
-		// kill nginx by PID
 		killPidFile(nginxPid)
 
-		// extra safety: kill by port (dari config project, kalau ada)
+		// 🔥 IMPORTANT: remove stale socket
+		removeSocket(phpSock)
+
+		// Extra safety: kill by port (jika config ada)
 		cfg, err := LoadProjectConfig(e.BasePath, project)
 		if err == nil {
-			// port nginx project
-			killPort(cfg.Port)
-			// port php-fpm project (port+100)
-			killPort(cfg.Port + 100)
+			killPort(cfg.Port)       // nginx
+			killPort(cfg.Port + 100) // php-fpm (tcp fallback)
 		}
 	}
 }
@@ -240,7 +246,7 @@ func (e *Engine) ForceKillAllProjectRuntimes() {
 	// 1) cleanup normal
 	e.cleanupProjectRuntimes()
 
-	// 2) kill by scanning all project configs
+	// 2) scan semua project config
 	projectsDir := filepath.Join(e.BasePath, "projects")
 
 	entries, err := os.ReadDir(projectsDir)
@@ -261,13 +267,19 @@ func (e *Engine) ForceKillAllProjectRuntimes() {
 		}
 
 		// Kill runtime ports
-		killPort(cfg.Port)       // nginx port
-		killPort(cfg.Port + 100) // php-fpm port
+		killPort(cfg.Port)
+		killPort(cfg.Port + 100)
 
-		// Kill leftover PIDs in runtime folder
-		runtimeRun := filepath.Join(e.BasePath, "runtime", project, "run")
+		// Runtime paths
+		projectRuntime := filepath.Join(e.BasePath, "runtime", project)
+		runDir := filepath.Join(projectRuntime, "run")
+		phpDir := filepath.Join(projectRuntime, "php")
 
-		killPidFile(filepath.Join(runtimeRun, "php-fpm.pid"))
-		killPidFile(filepath.Join(runtimeRun, "nginx.pid"))
+		// Kill PID files
+		killPidFile(filepath.Join(runDir, "php-fpm.pid"))
+		killPidFile(filepath.Join(runDir, "nginx.pid"))
+
+		// 🔥 REMOVE SOCKET (ROOT CAUSE BUG)
+		removeSocket(filepath.Join(phpDir, "php-fpm.sock"))
 	}
 }

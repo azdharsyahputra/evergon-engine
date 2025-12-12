@@ -22,10 +22,6 @@ func (r *ProjectRegistry) projectPath(name string) string {
 	return filepath.Join(r.BasePath, "projects", name)
 }
 
-func (r *ProjectRegistry) configPath(name string) string {
-	return filepath.Join(r.projectPath(name), ".evergon", "config.json")
-}
-
 // -----------------------
 // CREATE PROJECT
 // -----------------------
