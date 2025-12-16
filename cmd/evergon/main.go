@@ -287,14 +287,9 @@ func handleToolsCommand(engine *core.Engine) {
 		fmt.Println("[Tools] Scanning tools...")
 
 		mgr := tools.Manager{
-			Base: engine.BasePath,
-			PhpSockAbs: filepath.Join(
-				engine.BasePath,
-				"runtime",
-				"landingpage",
-				"php",
-				"php-fpm.sock",
-			),
+			Base:       engine.BasePath,
+			PhpSockAbs: engine.ToolsPHPSocket(),
+
 			NginxReload: func() error {
 				return engine.ReloadNginx()
 			},

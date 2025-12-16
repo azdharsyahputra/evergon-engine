@@ -31,9 +31,11 @@ func NewEngine(base string) *Engine {
 		Config:   cfg,
 	}
 
-	// Build services awal berdasarkan config
+	e.ensureToolsPHPConfig()
+
 	e.Services = []services.Service{
-		services.NewPHPService(base, cfg.PHPVersion),
+		services.NewPHPService(base, cfg.PHPVersion),  // project PHP
+		services.NewToolsPHPService(base, e.PHPBin()), // 👈 TOOLS PHP
 		services.NewNginxService(base, www),
 	}
 
@@ -295,4 +297,48 @@ func (e *Engine) ForceKillAllProjectRuntimes() {
 		// 🔥 REMOVE SOCKET (ROOT CAUSE BUG)
 		removeSocket(filepath.Join(phpDir, "php-fpm.sock"))
 	}
+}
+func (e *Engine) ToolsPHPRuntime() string {
+	return filepath.Join(e.BasePath, "runtime", "_tools", "php")
+}
+
+func (e *Engine) ToolsPHPSocket() string {
+	return filepath.Join(e.ToolsPHPRuntime(), "php-fpm.sock")
+}
+func (e *Engine) ensureToolsPHPConfig() error {
+	rt := e.ToolsPHPRuntime()
+	_ = os.MkdirAll(filepath.Join(rt, "logs"), 0755)
+
+	conf := filepath.Join(rt, "php-fpm.conf")
+	if _, err := os.Stat(conf); err == nil {
+		return nil
+	}
+
+	content := `
+[global]
+error_log = ` + rt + `/logs/error.log
+daemonize = no
+
+[www]
+listen = ` + e.ToolsPHPSocket() + `
+listen.mode = 0660
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 1
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+`
+
+	return os.WriteFile(conf, []byte(content), 0644)
+}
+func (e *Engine) PHPBin() string {
+	// sesuaikan dengan cara lu resolve php-fpm sekarang
+	// contoh umum:
+	return filepath.Join(
+		e.BasePath,
+		"php",
+		e.Config.PHPVersion,
+		"sbin",
+		"php-fpm",
+	)
 }
