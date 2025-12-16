@@ -25,22 +25,24 @@ func main() {
 	// ONE-TIME SETUP (PRIVILEGE)
 	// ----------------------------
 	case "setup":
+
 		if err := engine.SetupTrust(); err != nil {
-			fmt.Println("Setup failed:", err)
+			fmt.Println("\nSetup failed:", err)
 			os.Exit(1)
 		}
 
-		fmt.Println("✔ Setup completed")
+		fmt.Println("\n✔ Evergon setup completed")
 		os.Exit(0)
 
 	// ----------------------------
 	// START ENGINE
 	// ----------------------------
 	case "start":
+
 		// PRE-FLIGHT CHECKS (GUARD)
 		results := engine.PreflightChecks()
 		if !printChecks(results) {
-			fmt.Println("\nCannot start: preflight checks failed.")
+			fmt.Println("\nEvergon cannot start due to failed checks.")
 			os.Exit(1)
 		}
 
@@ -59,7 +61,7 @@ func main() {
 			api.StartAPIServer(engine)
 		}()
 
-		fmt.Println("\nEngine is ready.")
+		fmt.Println("\nEvergon is ready.")
 		select {} // keep alive
 
 	// ----------------------------
@@ -69,7 +71,7 @@ func main() {
 		if err := engine.StopAll(); err != nil {
 			fmt.Println("Error stopping services:", err)
 		} else {
-			fmt.Println("✔ Engine stopped")
+			fmt.Println("✔ Evergon stopped")
 		}
 		os.Exit(0)
 
@@ -95,7 +97,6 @@ func main() {
 		printUsage()
 	}
 }
-
 func printChecks(results []core.CheckResult) bool {
 	ok := true
 	for _, r := range results {
