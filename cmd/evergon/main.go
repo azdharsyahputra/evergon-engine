@@ -21,35 +21,69 @@ func main() {
 
 	switch os.Args[1] {
 
-	case "start":
-		fmt.Println("[Init] Cleaning project runtimes before start...")
-		engine.ForceKillAllProjectRuntimes()
-
-		if err := engine.StartAll(); err != nil {
-			fmt.Println("Error starting services:", err)
-			return
+	// ----------------------------
+	// ONE-TIME SETUP (PRIVILEGE)
+	// ----------------------------
+	case "setup":
+		if err := engine.SetupTrust(); err != nil {
+			fmt.Println("Setup failed:", err)
+			os.Exit(1)
 		}
 
+		fmt.Println("✔ Setup completed")
+		os.Exit(0)
+
+	// ----------------------------
+	// START ENGINE
+	// ----------------------------
+	case "start":
+		// PRE-FLIGHT CHECKS (GUARD)
+		results := engine.PreflightChecks()
+		if !printChecks(results) {
+			fmt.Println("\nCannot start: preflight checks failed.")
+			os.Exit(1)
+		}
+
+		fmt.Println("\n[Init] Cleaning project runtimes...")
+		engine.ForceKillAllProjectRuntimes()
+
+		fmt.Println("\nStarting services...\n")
+		if err := engine.StartAll(); err != nil {
+			fmt.Println("Error starting services:", err)
+			os.Exit(1)
+		}
+
+		// API
 		go func() {
-			fmt.Println("[API] Starting Evergon API on :7070 ...")
+			fmt.Println("✔ API started on http://localhost:7070")
 			api.StartAPIServer(engine)
 		}()
 
-		fmt.Println("Evergon fully started. API available at http://localhost:7070")
-		select {} // block forever
+		fmt.Println("\nEngine is ready.")
+		select {} // keep alive
 
+	// ----------------------------
+	// STOP ENGINE
+	// ----------------------------
 	case "stop":
-		err := engine.StopAll()
-		if err != nil {
+		if err := engine.StopAll(); err != nil {
 			fmt.Println("Error stopping services:", err)
+		} else {
+			fmt.Println("✔ Engine stopped")
 		}
 		os.Exit(0)
 
+	// ----------------------------
+	// API ONLY
+	// ----------------------------
 	case "api":
-		fmt.Println("[Init] Cleaning project runtimes before API start...")
+		fmt.Println("[Init] Cleaning project runtimes...")
 		engine.ForceKillAllProjectRuntimes()
 		api.StartAPIServer(engine)
 
+	// ----------------------------
+	// SUB COMMANDS
+	// ----------------------------
 	case "php":
 		handlePHPCommand(engine)
 
@@ -60,6 +94,23 @@ func main() {
 		fmt.Println("Unknown command:", os.Args[1])
 		printUsage()
 	}
+}
+
+func printChecks(results []core.CheckResult) bool {
+	ok := true
+	for _, r := range results {
+		if r.OK {
+			fmt.Printf("[Check] %-18s OK\n", r.Name)
+		} else {
+			ok = false
+			fmt.Printf("[Check] %-18s FAIL\n", r.Name)
+			fmt.Println("        Reason:", r.Reason)
+			if r.Fix != "" {
+				fmt.Println("        Fix   :", r.Fix)
+			}
+		}
+	}
+	return ok
 }
 
 ////////////////////////////////////////////////////////

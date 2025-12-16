@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"evergon/internal/util"
 )
@@ -26,7 +28,7 @@ func (s *NginxService) Name() string { return "nginx" }
 
 func (s *NginxService) Start() error {
 	// Bersihkan port dan PID lama
-	util.KillPort(8080)
+	util.KillPort(80)
 	util.CleanupPID(filepath.Join(s.Base, "logs/nginx.pid"))
 	util.PrepareNginxDirs(s.Base)
 
@@ -43,6 +45,7 @@ func (s *NginxService) Start() error {
 	cmd := exec.Command(nginxBin,
 		"-p", s.Base,
 		"-c", confFile,
+		"-g", "daemon off;",
 	)
 
 	// Fix lib dependency untuk portable build
@@ -56,8 +59,25 @@ func (s *NginxService) Start() error {
 }
 
 func (s *NginxService) Stop() error {
-	util.StopPID(filepath.Join(s.Base, "logs/nginx.pid"))
-	util.KillPort(8080)
+	pidFile := filepath.Join(s.Base, "logs/nginx.pid")
+
+	pid := util.GetPID(pidFile)
+	if pid <= 0 {
+		return nil
+	}
+
+	// SIGTERM = graceful shutdown
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return err
+	}
+
+	_ = proc.Signal(syscall.SIGTERM)
+
+	// optional: wait & cleanup
+	time.Sleep(500 * time.Millisecond)
+	util.CleanupPID(pidFile)
+
 	return nil
 }
 
@@ -66,7 +86,7 @@ func (s *NginxService) Status() ServiceStatus {
 	return ServiceStatus{
 		Running: util.IsAlive(pid),
 		PID:     pid,
-		Port:    8080,
+		Port:    80,
 	}
 }
 
@@ -88,7 +108,7 @@ func (s *NginxService) generateConfig(outPath string) error {
 	if serverBlocks == "" {
 		serverBlocks = fmt.Sprintf(`
 server {
-    listen 8080 default_server;
+    listen 80 default_server;
     server_name localhost;
     root %s;
     index index.php index.html;
@@ -152,9 +172,9 @@ func (s *NginxService) buildServerBlocks(fastcgiConf string) (string, error) {
 		}
 
 		// first server becomes default server
-		listen := "8080"
+		listen := "80"
 		if first {
-			listen = "8080 default_server"
+			listen = "80 default_server"
 			first = false
 		}
 
