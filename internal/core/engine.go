@@ -178,6 +178,19 @@ func (e *Engine) StopAll() error {
 	fmt.Println("Evergon stopped cleanly.")
 	return nil
 }
+func (e *Engine) ReloadNginx() error {
+	for _, s := range e.Services {
+		if s.Name() == "nginx" {
+			if r, ok := s.(interface {
+				Reload() error
+			}); ok {
+				return r.Reload()
+			}
+			return fmt.Errorf("nginx service does not support reload")
+		}
+	}
+	return fmt.Errorf("nginx service not found")
+}
 
 // ---------- STATUS ----------
 

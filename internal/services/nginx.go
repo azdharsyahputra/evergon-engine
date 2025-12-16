@@ -93,11 +93,12 @@ func (s *NginxService) Status() ServiceStatus {
 // -------------------------------------------------
 // CONFIG GENERATOR
 // -------------------------------------------------
-
 func (s *NginxService) generateConfig(outPath string) error {
-	mimeTypes := filepath.Join(s.Base, "conf/mime.types")
-	fastcgiConf := filepath.Join(s.Base, "conf/fastcgi.conf")
+	mimeTypes := filepath.Join(s.Base, "conf", "mime.types")
+	fastcgiConf := filepath.Join(s.Base, "conf", "fastcgi.conf")
 	logDir := filepath.Join(s.Base, "logs")
+
+	toolsInclude := filepath.Join(s.Base, "conf.d", "tools", "*.conf")
 
 	serverBlocks, err := s.buildServerBlocks(fastcgiConf)
 	if err != nil {
@@ -134,9 +135,12 @@ http {
     access_log  %s/access.log;
     error_log   %s/error.log;
 
+    # Evergon tools
+    include %s;
+
 %s
 }
-`, mimeTypes, logDir, logDir, serverBlocks)
+`, mimeTypes, logDir, logDir, toolsInclude, serverBlocks)
 
 	return os.WriteFile(outPath, []byte(conf), 0644)
 }
@@ -202,4 +206,17 @@ server {
 	}
 
 	return strings.Join(servers, "\n"), nil
+}
+func (s *NginxService) Reload() error {
+	cmd := exec.Command(
+		filepath.Join(s.Base, "sbin", "nginx"),
+		"-p", s.Base,
+		"-c", filepath.Join(s.Base, "conf", "nginx.conf"),
+		"-s", "reload",
+	)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Println("[DEBUG] Reload nginx with -p -c from Evergon")
+	return cmd.Run()
 }

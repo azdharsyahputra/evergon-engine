@@ -8,6 +8,7 @@ import (
 
 	"evergon/internal/api"
 	"evergon/internal/core"
+	"evergon/internal/tools"
 )
 
 func main() {
@@ -85,6 +86,8 @@ func main() {
 
 	case "project":
 		handleProjectCommand(engine)
+	case "tools":
+		handleToolsCommand(engine)
 
 	default:
 		fmt.Println("Unknown command:", os.Args[1])
@@ -269,11 +272,58 @@ func handleProjectCommand(engine *core.Engine) {
 }
 
 ////////////////////////////////////////////////////////
+// TOOLS SUBCOMMANDS (MVP)
+////////////////////////////////////////////////////////
+
+func handleToolsCommand(engine *core.Engine) {
+	if len(os.Args) < 3 {
+		printToolsUsage()
+		return
+	}
+
+	switch os.Args[2] {
+
+	case "sync":
+		fmt.Println("[Tools] Scanning tools...")
+
+		mgr := tools.Manager{
+			Base: engine.BasePath,
+			PhpSockAbs: filepath.Join(
+				engine.BasePath,
+				"runtime",
+				"landingpage",
+				"php",
+				"php-fpm.sock",
+			),
+			NginxReload: func() error {
+				return engine.ReloadNginx()
+			},
+		}
+
+		if err := mgr.SyncAll(); err != nil {
+			fmt.Println("Tools sync failed:", err)
+			return
+		}
+
+		fmt.Println("✔ Tools synced successfully")
+
+	default:
+		fmt.Println("Unknown tools command:", os.Args[2])
+		printToolsUsage()
+	}
+}
+func printToolsUsage() {
+	fmt.Println("Tools Commands:")
+	fmt.Println("  evergon tools sync")
+}
+
+////////////////////////////////////////////////////////
 // HELPERS
 ////////////////////////////////////////////////////////
 
 func printUsage() {
 	fmt.Println("Usage:")
+	fmt.Println("  evergon setup")
 	fmt.Println("  evergon start")
 	fmt.Println("  evergon stop")
 	fmt.Println("  evergon api")
@@ -284,6 +334,7 @@ func printUsage() {
 	fmt.Println("  evergon project info <name>")
 	fmt.Println("  evergon project set-port <name> <port>")
 	fmt.Println("  evergon project restart <name>")
+	fmt.Println("  evergon tools sync")
 }
 
 func printPHPUsage() {
